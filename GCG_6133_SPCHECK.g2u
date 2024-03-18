@@ -1,0 +1,70 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'project to check if a sales person is entered on the quote and the sales order screen. if not entered, do not allow to save. enabled on the pre save and pre lines hooks for both.
+'developerd by AD
+'quote no 12235
+
+V.Local.sSP.Declare(String, "")
+V.Local.sSql.Declare(String, "")
+V.Local.sComposite.Declare(String, "")
+V.Local.sFilter.Declare(String, "")
+V.Local.sTemp.Declare(String, "")
+
+F.Intrinsic.Control.If(v.Caller.Hook,=,11869,"OR",v.Caller.Hook,=,11810,v.Caller.Hook,=,10922,v.Caller.Hook,=,10870)
+	V.Local.sSP.Set(V.Passed.000030)
+	F.Intrinsic.Control.If(v.local.sSP.Trim,=,"")
+		F.Intrinsic.UI.Msgbox("Please enter a valid Sales Rep before proceeding.")
+		V.Passed.777777.Set(1)
+		F.Intrinsic.Control.End
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+'Addition by FEQ for Caragh
+
+'The customer wants to pre-populate the Salesperson with the username of the person creating the quote
+F.Intrinsic.Control.If(V.Caller.Hook, =, 10710)
+	'They create quotes from the BOM screen, so for some reason, when the screen pops up, it opens with the switch 'O' for open instead of 'N' for new
+	'So instead of doing a 'new' check, we are going to check to see if there is a salesperson on there
+	V.Local.sSP.Set(V.Passed.000030)
+	
+	F.Intrinsic.Control.If(V.Local.sSP.Trim, =, "")
+		
+		F.Global.Security.GetFullName(V.Caller.User, V.Local.sSP)
+		F.Intrinsic.String.Split(V.Local.sSP, " ", V.Local.sTemp)
+		
+		F.Intrinsic.String.Build("{0} {1}", V.Local.sTemp(0).Temp, V.Local.sTemp(V.Local.sTemp.UBound).Temp, V.Local.sComposite)
+		
+		F.ODBC.Connection!conx.OpenCompanyConnection
+		F.Data.DataTable.CreateFromSQL("dtSalesppl", "conx", "Select UCASE(NAME) as SP from V_SALESPERSONS")
+		F.ODBC.Connection!conx.Close
+		
+		F.Intrinsic.String.Build("[SP] = '{0}'", V.Local.sSP.UCase, V.Local.sFilter)
+		F.Data.DataView.Create("dtSalesppl", "dvFull", 22, V.Local.sFilter, "")
+		F.Intrinsic.Control.If(V.DataView.dtSalesppl!dvFull.RowCount, >, 0)
+			V.Passed.000030.Set(V.Local.sSP.UCase)
+			F.Data.DataView.Close("dtSalesppl", "dvFull")
+			F.Data.DataTable.Close("dtSalesppl")
+			F.Intrinsic.Control.End
+		F.Intrinsic.Control.EndIf
+		
+		F.Intrinsic.String.Build("[SP] = '{0}'", V.Local.sComposite.UCase, V.Local.sFilter)
+		F.Data.DataView.Create("dtSalesppl", "dvComp", 22, V.Local.sFilter, "")
+		F.Intrinsic.Control.If(V.DataView.dtSalesppl!dvComp.RowCount, >, 0)
+			V.Passed.000030.Set(V.Local.sComposite.UCase)
+			F.Data.DataView.Close("dtSalesppl", "dvFull")
+			F.Data.DataView.Close("dtSalesppl", "dvComp")
+			F.Data.DataTable.Close("dtSalesppl")
+			F.Intrinsic.Control.End
+		F.Intrinsic.Control.EndIf
+		
+		'If they get here, the name of the user was not found among the salespersons, so we print them an error message:
+		F.Intrinsic.String.Build("Salesperson '{0}' was not found in the list of salesperson in Global Shop.{1}Please go to Company Options - Standard AR Tables and add the sales person into the system.", V.Local.sSP, V.Ambient.NewLine, V.Local.sSql)
+		F.Intrinsic.UI.Msgbox(V.Local.sSql)
+	
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+Program.Sub.Main.End
